@@ -1,0 +1,6 @@
+train: ../datasets/hazardous_dataset/images/train  # train images (relative to 'path')
+val: ../datasets/hazardous_dataset/images/val  # val images (relative to 'path')
+
+names:
+  0: flammable
+  1: oxidizer
