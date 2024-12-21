@@ -1,0 +1,560 @@
+<!---<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Interaction with Navigation</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #181818;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+
+        .canvas-container {
+            border: 5px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 10px;
+            background-color: #222;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 18px;
+            background-color: #3498db;
+            border: none;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #1e1e1e;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .close-btn {
+            background-color: #e74c3c;
+            padding: 12px;
+            border-radius: 5px;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+        }
+
+        .close-btn:hover {
+            background-color: #c0392b;
+        }
+
+        @media (max-width: 600px) {
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button onclick="openModal()">Open 3D Model</button>
+
+    <div id="modelModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal()">X</button>
+            <div class="canvas-container">
+                <canvas id="3dCanvas"></canvas>
+            </div>
+            <div class="controls">
+                <button onclick="moveCamera('forward')">Forward</button>
+                <button onclick="moveCamera('backward')">Backward</button>
+                <button onclick="moveCamera('left')">Left</button>
+                <button onclick="moveCamera('right')">Right</button>
+                <button onclick="moveCamera('up')">Up</button>
+                <button onclick="moveCamera('down')">Down</button>
+                <button onclick="moveCamera('rotate-left')">Rotate Left</button>
+                <button onclick="moveCamera('rotate-right')">Rotate Right</button>
+                <button onclick="moveCamera('rotate-up')">Rotate Up</button>
+                <button onclick="moveCamera('rotate-down')">Rotate Down</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/MTLLoader.js"></script>
+
+    <script>
+        // Open Modal
+        function openModal() {
+            document.getElementById('modelModal').style.display = 'flex';
+        }
+
+        // Close Modal
+        function closeModal() {
+            document.getElementById('modelModal').style.display = 'none';
+        }
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('3dCanvas') });
+        renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Add ambient light
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        // Load .mtl and .obj model
+        const mtlLoader = new THREE.MTLLoader();
+        mtlLoader.load('show/model_3d/Dept GF-2.mtl', function (materials) {
+            materials.preload();
+            const objLoader = new THREE.OBJLoader();
+            objLoader.setMaterials(materials);
+            objLoader.load('show/model_3d/Dept GF-2.obj', function (object) {
+                scene.add(object);
+
+                // Center the model
+                const box = new THREE.Box3().setFromObject(object);
+                const center = box.getCenter(new THREE.Vector3());
+                camera.position.set(center.x, center.y + 2, center.z + 5);
+                camera.lookAt(center);
+            });
+        });
+
+        // Track current camera position
+        let cameraPosition = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+
+        // Navigation function with movement and rotation
+        function moveCamera(direction) {
+            const movementSpeed = 0.5;
+            const rotationSpeed = Math.PI / 30;
+
+            if (direction === 'forward') {
+                camera.translateZ(-movementSpeed);
+                cameraPosition.z -= movementSpeed;
+            }
+            if (direction === 'backward') {
+                camera.translateZ(movementSpeed);
+                cameraPosition.z += movementSpeed;
+            }
+            if (direction === 'left') {
+                camera.translateX(-movementSpeed);
+                cameraPosition.x -= movementSpeed;
+            }
+            if (direction === 'right') {
+                camera.translateX(movementSpeed);
+                cameraPosition.x += movementSpeed;
+            }
+            if (direction === 'up') {
+                camera.translateY(movementSpeed);
+                cameraPosition.y += movementSpeed;
+            }
+            if (direction === 'down') {
+                camera.translateY(-movementSpeed);
+                cameraPosition.y -= movementSpeed;
+            }
+
+            if (direction === 'rotate-left') camera.rotation.y -= rotationSpeed;
+            if (direction === 'rotate-right') camera.rotation.y += rotationSpeed;
+            if (direction === 'rotate-up') camera.rotation.x -= rotationSpeed;
+            if (direction === 'rotate-down') camera.rotation.x += rotationSpeed;
+
+            sendCoordinates();
+        }
+
+        // Send updated camera coordinates to the server
+        function sendCoordinates() {
+            fetch('/process-coordinates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cameraPosition)
+            })
+            .then(response => response.json())
+            .then(data => console.log('Response from server:', data));
+        }
+
+        // Raycaster for detecting clicks
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                console.log(`Clicked at coordinates: X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}`);
+
+                fetch('/process-coordinates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ x: point.x, y: point.y, z: point.z })
+                })
+                .then(response => response.json())
+                .then(data => console.log('Response from server:', data));
+            }
+        }
+
+        window.addEventListener('click', onMouseClick);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Interaction with Navigation</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #181818; /* Dark mode background */
+            font-family: Arial, sans-serif;
+            color: #fff; /* Light text for contrast */
+        }
+
+        /* Styles for the pop-up modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8); /* Semi-transparent background */
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            height: 80%;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            overflow-y: auto;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 10px;
+            background-color: #222; /* Dark background for the canvas */
+            width: 100%;
+            height: 80%;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 12px 18px;
+            background-color: #3498db;
+            border: none;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* Button to open the modal */
+        .button-container {
+            margin-top: 15px;
+        }
+
+        .coordinates-display {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <button id="openModalBtn">Open 3D Model</button>
+
+    <!-- Modal Pop-up -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <canvas id="3dCanvas"></canvas>
+
+            <!-- Coordinates display -->
+            <div id="coordinatesDisplay" class="coordinates-display">
+                Coordinates: X: 0.00, Y: 0.00, Z: 0.00
+            </div>
+
+            <!-- Controls inside the modal -->
+            <div class="controls">
+                <button onclick="moveCamera('forward')">Forward</button>
+                <button onclick="moveCamera('backward')">Backward</button>
+                <button onclick="moveCamera('left')">Left</button>
+                <button onclick="moveCamera('right')">Right</button>
+                <button onclick="moveCamera('up')">Up</button>
+                <button onclick="moveCamera('down')">Down</button>
+                <button onclick="moveCamera('rotate-left')">Rotate Left</button>
+                <button onclick="moveCamera('rotate-right')">Rotate Right</button>
+                <button onclick="moveCamera('rotate-up')">Rotate Up</button>
+                <button onclick="moveCamera('rotate-down')">Rotate Down</button>
+            </div>
+            <br><br>
+            <!-- Save Button -->
+            <button id="saveCoordinatesBtn">Save Coordinates</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        const openModalBtn = document.getElementById('openModalBtn');
+        const modal = document.getElementById('modal');
+        const coordinatesDisplay = document.getElementById('coordinatesDisplay');
+        const saveCoordinatesBtn = document.getElementById('saveCoordinatesBtn');
+
+        let clickedCoordinates = { x: 0, y: 0, z: 0 };
+
+        // Open the modal when the button is clicked
+        openModalBtn.addEventListener('click', function() {
+            modal.style.display = 'flex';  // Show the modal
+        });
+
+        // Close the modal when the overlay is clicked
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';  // Hide the modal
+            }
+        });
+
+        // Set up the 3D scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('3dCanvas') });
+        renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Add ambient light
+        // Add ambient light (soft light, affects all objects)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // White light with intensity 0.5
+        scene.add(ambientLight);
+
+        // Add a directional light (strong, focused light, like sunlight)
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // White light with intensity 1
+        directionalLight.position.set(5, 5, 5); // Set light position (x, y, z)
+        scene.add(directionalLight);
+
+        // Add a point light (a light source that radiates in all directions)
+        const pointLight = new THREE.PointLight(0xff0000, 1, 100); // Red light with intensity 1 and distance 100
+        pointLight.position.set(0, 10, 0); // Set light position
+        scene.add(pointLight);
+
+        // Add a spot light (a spotlight that shines in a specific direction)
+        const spotLight = new THREE.SpotLight(0x00ff00, 1, 100, Math.PI / 6, 0.5, 1); // Green light with intensity 1 and a cone angle of 30 degrees
+        spotLight.position.set(-5, 5, 5); // Set light position
+        scene.add(spotLight);
+
+        // Add a hemisphere light (a light source coming from above, with two colors)
+        const hemisphereLight = new THREE.HemisphereLight(0xaaaaaa, 0x000000, 1); // White light from the sky, black from the ground, with intensity 1
+        scene.add(hemisphereLight);
+
+
+        // Load .glb model
+        const gltfLoader = new THREE.GLTFLoader();
+        gltfLoader.load('show/model_3d/Dept GF-1.glb', function (gltf) {
+            const model = gltf.scene;
+            scene.add(model);
+
+            // Center the model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            camera.position.set(center.x, center.y+45, center.z+5);
+            camera.lookAt(center);
+        });
+        camera.position.set(76.76, 4.41, -50.29);
+
+        // Track current camera position
+        let cameraPosition = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+
+        // Navigation function with movement and rotation
+        function moveCamera(direction) {
+            const movementSpeed = 0.5;
+            const rotationSpeed = Math.PI / 30; // Controls the rotation speed
+
+            if (direction === 'forward') {
+                camera.translateZ(-movementSpeed);
+                cameraPosition.z -= movementSpeed;
+            }
+            if (direction === 'backward') {
+                camera.translateZ(movementSpeed);
+                cameraPosition.z += movementSpeed;
+            }
+            if (direction === 'left') {
+                camera.translateX(-movementSpeed);
+                cameraPosition.x -= movementSpeed;
+            }
+            if (direction === 'right') {
+                camera.translateX(movementSpeed);
+                cameraPosition.x += movementSpeed;
+            }
+            if (direction === 'up') {
+                camera.translateY(movementSpeed);
+                cameraPosition.y += movementSpeed;
+            }
+            if (direction === 'down') {
+                camera.translateY(-movementSpeed);
+                cameraPosition.y -= movementSpeed;
+            }
+
+            // Rotate the camera for changing the angle
+            if (direction === 'rotate-left') camera.rotation.y -= rotationSpeed;  // Rotate left (counter-clockwise)
+            if (direction === 'rotate-right') camera.rotation.y += rotationSpeed; // Rotate right (clockwise)
+            if (direction === 'rotate-up') camera.rotation.x -= rotationSpeed;    // Rotate up
+            if (direction === 'rotate-down') camera.rotation.x += rotationSpeed;  // Rotate down
+
+            // Send the updated camera position to the server
+            sendCoordinates();
+        }
+
+        // Function to send updated camera coordinates to the server
+        function sendCoordinates() {
+            fetch('/process-coordinates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cameraPosition)
+            })
+            .then(response => response.json())
+            .then(data => console.log('Response from server:', data));
+        }
+
+        // Raycaster for detecting clicks
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                clickedCoordinates = { x: point.x, y: point.y, z: point.z };
+                coordinatesDisplay.innerHTML = `Coordinates: X: ${point.x.toFixed(2)}, Y: ${point.y.toFixed(2)}, Z: ${point.z.toFixed(2)}`;
+            }
+        }
+
+        window.addEventListener('click', onMouseClick);
+
+        // Save the coordinates when the button is clicked
+        saveCoordinatesBtn.addEventListener('click', function() {
+            fetch('/process-coordinates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(clickedCoordinates)
+            })
+            .then(response => response.json())
+            .then(data => console.log('Coordinates saved:', data));
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
